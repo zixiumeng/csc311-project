@@ -305,17 +305,16 @@ def main():
     optimal_epoch = 0
     optimal_lr = 0
     for k in lst_k:
-        model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
-
-        model.to(device)
 
         # Set optimization hyperparameters.
         for lr in lst_lr:
             for num_epoch in lst_epoch:
+                model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
+                model.to(device)
                 lamb = 2.0  # we don;t use it
 
                 train_stats, validation_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
-                                                                    valid_data, num_epoch)
+                                                      valid_data, num_epoch)
                 # avg_accuracy = average(lst_accuracy)
                 result_accuracy = max(validation_stats['acc'])
                 if result_accuracy > max_accuracy:
@@ -331,22 +330,21 @@ def main():
     print(optimal_epoch)
 
     # (d)
-    # choose the device to run data
-    if torch.cuda.is_available():
-        print('using GPU')
-        device = torch.device('cuda')
-    else:
-        device = 'cpu'
-        
+    # # choose the device to run data
+    # if torch.cuda.is_available():
+    #     print('using GPU')
+    #     device = torch.device('cuda')
+    # else:
+    #     device = 'cpu'
+
     model = AutoEncoder(num_question=train_matrix.shape[1], k=optimal_k)
-    
     model.to(device)
 
     lamb = 2.0  # we don;t use it
     num_epoch = optimal_epoch
     lr = optimal_lr
     train_stats, validation_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
-                                                        valid_data, num_epoch, 0)
+                                          valid_data, num_epoch, 0)
 
     # plt.plot(lst_epoch, accuracy_lst, label="accuracy")
     # plt.title("Accuracy vs. Epoch")
@@ -372,8 +370,10 @@ def main():
     # (e)
     weight_decay_lst = [0, 0.001, 0.01, 0.1, 1]
     for weight_decay in weight_decay_lst:
+        model = AutoEncoder(num_question=train_matrix.shape[1], k=optimal_k)
+        model.to(device)
         train_stats, valid_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
-                                                       valid_data, num_epoch, weight_decay)
+                                         valid_data, num_epoch, weight_decay)
 
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 6))
 
