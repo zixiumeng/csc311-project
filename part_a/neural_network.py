@@ -14,6 +14,7 @@ import numpy as np
 import torch
 
 from tqdm import tqdm
+import numpy as np
 
 
 # from matplotlib.pyplot import plot as plt
@@ -130,49 +131,34 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, w
     for epoch in tqdm(range(num_epoch)):
         train_loss = 0.
         total_train_accurate_num = 0
-
         for user_id in range(num_student):
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
             target = inputs.clone()
 
+            target2 = train_data[user_id]
+
             # zeroing gradients after each iteration
             optimizer.zero_grad()
             output = model(inputs)  # !!!!!!!!!
-
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
-
             loss = torch.sum((output - target) ** 2.) + model.get_weight_norm() * (weight_decay / 2)
-
             # backward pass for computing the gradients of the loss w.r.t to learnable parameters
             loss.backward()  # calculate output.grad() and target.grad()
-
             train_loss += loss.item()
 
-            total_train_accurate_num += get_train_accurate_num(output, target)
-
-            # train_stats['loss'].append(loss.item())
-            # train_stats['acc'].append(evaluate(output, target).item())
-            # train_stats['epoch'].append(epoch + user_id / num_student)
-
-            # validation_stats['loss'].append(loss.item())
-
+            # total_train_accurate_num += get_train_accurate_num(output, target2)
             # updating the parameters after each iteration
             optimizer.step()
-
             # record train_stats
-            train_stats['loss'].append(loss.item() / num_questions)
-            train_stats['acc'].append(get_train_accuracy(output, target))
+            accuracy, total_answered_questions = get_train_accuracy(output, target2)
+            train_stats['loss'].append(loss.item() / total_answered_questions)
+            train_stats['acc'].append(accuracy)
             train_stats['epoch'].append(epoch + user_id / num_student)
-
         valid_acc, validation_loss = evaluate(model, zero_train_data, valid_data)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
-        # if valid_acc > max_acc:
-        #     max_acc = valid_acc
-        # lst_accuracy.append(valid_acc)
-        # lst_loss.append(train_loss)
         print(total_train_accurate_num)
 
         validation_stats['loss'].append(validation_loss)
@@ -221,38 +207,41 @@ def evaluate(model, train_data, valid_data):
     return correct / float(total), total_loss / float(total)
 
 
-def get_train_accurate_num(model_output, real_output):
-    model_output_lst = model_output.tolist()[0]
-    real_output_lst = real_output.tolist()[0]
-
-    assert (len(model_output_lst) == len(real_output_lst))
-
-    n = len(model_output_lst)
-    total_accurate_num = 0
-    for i in range(n):
-        assert (type(model_output_lst[i]) == float)
-        assert (type(real_output_lst[i]) == float)
-        if model_output_lst[i] == real_output_lst[i]:
-            total_accurate_num += 1
-
-    return total_accurate_num
+# def get_train_accurate_num(model_output, real_output):
+#     model_output_lst = model_output.tolist()[0]
+#     real_output_lst = real_output.tolist()
+#
+#     assert (len(model_output_lst) == len(real_output_lst))
+#
+#     n = len(model_output_lst)
+#     total_accurate_num = 0
+#     for i in range(n):
+#         shit =  real_output_lst[i]
+#         if model_output_lst[i] == real_output_lst[i]:
+#             total_accurate_num += 1
+#
+#     return total_accurate_num
 
 
 def get_train_accuracy(model_output, real_output):
     model_output_lst = model_output.tolist()[0]
-    real_output_lst = real_output.tolist()[0]
+    real_output_lst = real_output.tolist()
 
     assert (len(model_output_lst) == len(real_output_lst))
 
     n = len(model_output_lst)
+    total_comparisons = n
     total_accurate_num = 0
     for i in range(n):
-        assert (type(model_output_lst[i]) == float)
-        assert (type(real_output_lst[i]) == float)
-        if model_output_lst[i] == real_output_lst[i]:
+        model_shit = model_output_lst[i] > 0.5
+        real_shit = real_output_lst[i]
+        if np.isnan(real_shit):
+            total_comparisons -=1
+            continue
+        if model_shit == real_shit:
             total_accurate_num += 1
 
-    return total_accurate_num / float(n)
+    return total_accurate_num / total_comparisons, total_comparisons
 
 
 # def _get_validation_stat(model, valid_data, device):
@@ -299,35 +288,35 @@ def main():
     else:
         device = 'cpu'
 
-    # initialize the max_accuracy
-    max_accuracy = 0
-    optimal_k = 0
-    optimal_epoch = 0
-    optimal_lr = 0
-    for k in lst_k:
-
-        # Set optimization hyperparameters.
-        for lr in lst_lr:
-            for num_epoch in lst_epoch:
-                model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
-                model.to(device)
-                lamb = 2.0  # we don;t use it
-
-                train_stats, validation_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
-                                                      valid_data, num_epoch)
-                # avg_accuracy = average(lst_accuracy)
-                result_accuracy = max(validation_stats['acc'])
-                if result_accuracy > max_accuracy:
-                    max_accuracy = result_accuracy
-                    optimal_k = k
-                    # optimal_model = result_model
-                    optimal_epoch = num_epoch
-                    optimal_lr = lr
-
-        print("k= ", k)
-    print(optimal_k)
-    print(optimal_lr)
-    print(optimal_epoch)
+    # # initialize the max_accuracy
+    # max_accuracy = 0
+    # optimal_k = 0
+    # optimal_epoch = 0
+    # optimal_lr = 0
+    # for k in lst_k:
+    #
+    #     # Set optimization hyperparameters.
+    #     for lr in lst_lr:
+    #         for num_epoch in lst_epoch:
+    #             model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
+    #             model.to(device)
+    #             lamb = 0.0  # we don;t use it
+    #
+    #             train_stats, validation_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
+    #                                                   valid_data, num_epoch)
+    #             # avg_accuracy = average(lst_accuracy)
+    #             result_accuracy = max(validation_stats['acc'])
+    #             if result_accuracy > max_accuracy:
+    #                 max_accuracy = result_accuracy
+    #                 optimal_k = k
+    #                 # optimal_model = result_model
+    #                 optimal_epoch = num_epoch
+    #                 optimal_lr = lr
+    #
+    #     print("k= ", k)
+    # print(optimal_k)
+    # print(optimal_lr)
+    # print(optimal_epoch)
 
     # (d)
     # # choose the device to run data
@@ -337,12 +326,14 @@ def main():
     # else:
     #     device = 'cpu'
 
-    model = AutoEncoder(num_question=train_matrix.shape[1], k=optimal_k)
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=10) #TODO: to change back to optimal_k
     model.to(device)
 
-    lamb = 2.0  # we don;t use it
-    num_epoch = optimal_epoch
-    lr = optimal_lr
+    lamb = 0.0  # we don;t use it
+    num_epoch = 10 #TODO: to change back to optimal_epoch
+    lr = 0.005   #TODO: to change back to optimal_lr
+
+    # for valid data
     train_stats, validation_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
                                           valid_data, num_epoch, 0)
 
@@ -367,28 +358,55 @@ def main():
     plt.legend()
     plt.show()
 
+    # for test data
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=10)  #TODO: to change back to optimal_k
+    model.to(device)
+    train_stats, test_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
+                                    test_data, num_epoch, 0)
+    print(test_stats['acc'])
+
     # (e)
     weight_decay_lst = [0, 0.001, 0.01, 0.1, 1]
+    max_accuracy = 0
+    optimal_wd = 0
+    optimal_train_stats = []
+    optimal_validation_stats = []
     for weight_decay in weight_decay_lst:
-        model = AutoEncoder(num_question=train_matrix.shape[1], k=optimal_k)
+        model = AutoEncoder(num_question=train_matrix.shape[1], k=10)  #TODO: to change back to optimal_k
         model.to(device)
         train_stats, valid_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
                                          valid_data, num_epoch, weight_decay)
 
-        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 6))
+        if max(valid_stats['acc']) > max_accuracy:
+            max_accuracy = max(valid_stats['acc'])
+            optimal_wd = weight_decay
+            optimal_train_stats = train_stats
+            optimal_validation_stats = valid_stats
 
-        axes[0].plot(train_stats['epoch'], train_stats['loss'], label='train', )
-        axes[0].plot(validation_stats['epoch'], validation_stats['loss'], label='validation')
-        axes[0].set_xlabel('Epoch')
-        axes[0].set_ylabel('Loss')
+    print("optimal_wd:", optimal_wd)
+    print("max_valid_accuracy:", max_accuracy)
 
-        axes[1].plot(train_stats['epoch'], train_stats['acc'], label='train')
-        axes[1].plot(validation_stats['epoch'], validation_stats['acc'], label='validation')
-        axes[1].set_xlabel('Epoch')
-        axes[1].set_ylabel('Accuracy')
+    # for test_data
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=10)    #TODO: to change back to optimal_k
+    model.to(device)
+    train_stats, test_stats = train(model, lr, lamb, train_matrix, zero_train_matrix,
+                                     test_data, num_epoch, optimal_wd)
+    print(test_stats['acc'])
 
-        plt.legend()
-        plt.show()
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 6))
+
+    axes[0].plot(optimal_train_stats['epoch'], optimal_train_stats['loss'], label='train', )
+    axes[0].plot(optimal_validation_stats['epoch'], optimal_validation_stats['loss'], label='validation')
+    axes[0].set_xlabel('Epoch')
+    axes[0].set_ylabel('Loss')
+
+    axes[1].plot(optimal_train_stats['epoch'], optimal_train_stats['acc'], label='train')
+    axes[1].plot(optimal_validation_stats['epoch'], optimal_validation_stats['acc'], label='validation')
+    axes[1].set_xlabel('Epoch')
+    axes[1].set_ylabel('Accuracy')
+
+    plt.legend()
+    plt.show()
 
     #####################################################################
     #                       END OF YOUR CODE                            #
