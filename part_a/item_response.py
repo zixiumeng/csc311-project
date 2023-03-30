@@ -35,6 +35,7 @@ def neg_log_likelihood(data, theta, beta):
 
         log_lklihood += (theta_i - beta_j) * c_ij - np.logaddexp(0, (theta_i - beta_j))
 
+
     # #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
