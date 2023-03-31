@@ -130,7 +130,7 @@ def irt(data, val_data, lr, iterations):
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta, alpha = update_theta_beta(data, lr, theta, beta, alpha)
 
-    return theta, beta, val_acc_lst, val_lld_lst, train_lld_lst
+    return alpha, theta, beta, val_acc_lst, val_lld_lst, train_lld_lst
 
 
 def evaluate(data, theta, beta, alpha):
@@ -165,9 +165,15 @@ def main():
     # code, report the validation and test accuracy.                    #
     #####################################################################
     iteration = 25
-    theta, beta, val_acc_lst, val_lld_lst, train_lld_lst = irt(train_data,
+    alpha, theta, beta, val_acc_lst, val_lld_lst, train_lld_lst = irt(train_data,
                                                                val_data, 0.01,
                                                                iteration)
+
+    print("-------------original data set-----------")
+    print(f"Final validation and test accuracy:")
+    print(f"validation accuracy: {evaluate(val_data, theta, beta,alpha)}")
+    print(f"test accuracy: {evaluate(test_data, theta, beta,alpha)} ")
+    print("------------------------------------------")
     iteration_lst = range(1, iteration + 1)
     # # Plot the x and y values using Matplotlib
     # plt.plot(iteration_lst, train_lld_lst)
